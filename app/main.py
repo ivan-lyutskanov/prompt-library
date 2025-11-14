@@ -90,9 +90,3 @@ async def delete_prompt(prompt_id: int, db: Session = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=404, detail="Prompt not found")
     return {"success": True}
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint - test live reload by changing this message."""
-    return {"status": "healthy", "message": "Live reload is working!"}
