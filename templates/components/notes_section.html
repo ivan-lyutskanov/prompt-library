@@ -1,0 +1,57 @@
+<div id="notes-section-{{ prompt.id }}" class="mt-6 pt-6 border-t border-gray-200" x-data="{ showAddForm: false }">
+    <div class="flex justify-between items-center mb-4">
+        <h4 class="text-lg font-semibold text-gray-900">Notes</h4>
+        <button 
+            @click="showAddForm = !showAddForm"
+            class="text-blue-600 hover:text-blue-800 font-medium text-sm transition duration-200"
+        >
+            <span x-show="!showAddForm">+ Add Note</span>
+            <span x-show="showAddForm">Cancel</span>
+        </button>
+    </div>
+
+    <!-- Add Note Form -->
+    <div x-show="showAddForm" x-transition style="display: none;" class="mb-4">
+        <form 
+            hx-post="/prompts/{{ prompt.id }}/notes"
+            hx-target="#notes-section-{{ prompt.id }}"
+            hx-swap="outerHTML"
+            @htmx:after-request="showAddForm = false"
+            class="space-y-3"
+        >
+            <textarea 
+                name="content" 
+                placeholder="Enter your note here..."
+                required
+                rows="4"
+                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            ></textarea>
+            <div class="flex gap-2">
+                <button 
+                    type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-md transition duration-200"
+                >
+                    Save Note
+                </button>
+                <button 
+                    type="button"
+                    @click="showAddForm = false"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold py-2 px-4 rounded-md transition duration-200"
+                >
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Notes List -->
+    <div class="space-y-3">
+        {% if prompt.notes %}
+            {% for note in prompt.notes %}
+                {% include 'components/note_card.html' %}
+            {% endfor %}
+        {% else %}
+            <p class="text-gray-500 text-sm italic py-4">No notes yet. Add one to get started.</p>
+        {% endif %}
+    </div>
+</div>

@@ -90,3 +90,57 @@ async def delete_prompt(prompt_id: int, db: Session = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=404, detail="Prompt not found")
     return {"success": True}
+
+
+# Note endpoints
+
+@app.post("/prompts/{prompt_id}/notes", response_class=HTMLResponse)
+async def create_note(
+    request: Request,
+    prompt_id: int,
+    content: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Create new note for a prompt and return updated notes section."""
+    # Verify prompt exists
+    prompt = crud.get_prompt(db, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    note_create = schemas.NoteCreate(content=content)
+    crud.create_note(db, prompt_id, note_create)
+    
+    # Refresh prompt to get updated notes
+    prompt = crud.get_prompt(db, prompt_id)
+    return templates.TemplateResponse(
+        "components/notes_section.html",
+        {"request": request, "prompt": prompt}
+    )
+
+
+@app.put("/notes/{note_id}", response_class=HTMLResponse)
+async def update_note(
+    request: Request,
+    note_id: int,
+    content: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Update note and return updated note card."""
+    note_update = schemas.NoteUpdate(content=content)
+    updated_note = crud.update_note(db, note_id, note_update)
+    if not updated_note:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    return templates.TemplateResponse(
+        "components/note_card.html",
+        {"request": request, "note": updated_note}
+    )
+
+
+@app.delete("/notes/{note_id}")
+async def delete_note(note_id: int, db: Session = Depends(get_db)):
+    """Delete note and return empty response."""
+    success = crud.delete_note(db, note_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return {"success": True}
