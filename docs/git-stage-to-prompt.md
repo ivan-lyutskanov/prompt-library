@@ -1,3 +1,1 @@
-check what is in the current git stage and create a prompt instruction to recreate it so i can add as a entry for my prompt library
-
-
+Examine the current git staging area and generate a prompt instruction that would recreate its contents, which I can then save as an entry in my prompt library.
