@@ -32,6 +32,21 @@ async def read_root(request: Request, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/search", response_class=HTMLResponse)
+async def search_prompts(
+    request: Request,
+    q: str = "",
+    db: Session = Depends(get_db)
+):
+    """Search prompts by title, content, or notes and return filtered list."""
+    search_query = q.strip() if q else None
+    prompts = crud.get_prompts(db, search_query=search_query)
+    return templates.TemplateResponse(
+        "components/prompt_list.html",
+        {"request": request, "prompts": prompts}
+    )
+
+
 @app.post("/prompts", response_class=HTMLResponse)
 async def create_prompt(
     request: Request,

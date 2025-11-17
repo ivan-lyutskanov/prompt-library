@@ -4,9 +4,20 @@ from sqlalchemy.orm import Session, joinedload
 from app import models, schemas
 
 
-def get_prompts(db: Session) -> list[models.Prompt]:
-    """Get all prompts, ordered by updated_at descending."""
-    return db.query(models.Prompt).order_by(models.Prompt.updated_at.desc()).all()
+def get_prompts(db: Session, search_query: str | None = None) -> list[models.Prompt]:
+    """Get all prompts, ordered by updated_at descending. Optionally filter by search query."""
+    query = db.query(models.Prompt)
+    
+    if search_query:
+        search_term = f"%{search_query}%"
+        # Search in prompt title, content, or notes content
+        query = query.outerjoin(models.Note).filter(
+            (models.Prompt.title.ilike(search_term)) |
+            (models.Prompt.content.ilike(search_term)) |
+            (models.Note.content.ilike(search_term))
+        ).distinct()
+    
+    return query.order_by(models.Prompt.updated_at.desc()).all()
 
 
 def get_prompt(db: Session, prompt_id: int) -> models.Prompt | None:
