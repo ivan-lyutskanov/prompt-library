@@ -101,7 +101,7 @@ async def create_note(
     content: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Create new note for a prompt and return updated notes section."""
+    """Create new note for a prompt and return updated notes list."""
     # Verify prompt exists
     prompt = crud.get_prompt(db, prompt_id)
     if not prompt:
@@ -112,10 +112,21 @@ async def create_note(
     
     # Refresh prompt to get updated notes
     prompt = crud.get_prompt(db, prompt_id)
-    return templates.TemplateResponse(
-        "components/notes_section.html",
-        {"request": request, "prompt": prompt}
-    )
+    
+    # Check if request is from modal (check HX-Target header)
+    hx_target = request.headers.get('HX-Target', '')
+    is_modal = 'modal-notes-list' in hx_target.lower()
+    
+    if is_modal:
+        return templates.TemplateResponse(
+            "components/modal_notes_list.html",
+            {"request": request, "prompt": prompt}
+        )
+    else:
+        return templates.TemplateResponse(
+            "components/notes_section.html",
+            {"request": request, "prompt": prompt}
+        )
 
 
 @app.put("/notes/{note_id}", response_class=HTMLResponse)
@@ -123,6 +134,7 @@ async def update_note(
     request: Request,
     note_id: int,
     content: str = Form(...),
+    modal: bool = False,
     db: Session = Depends(get_db)
 ):
     """Update note and return updated note card."""
@@ -131,8 +143,14 @@ async def update_note(
     if not updated_note:
         raise HTTPException(status_code=404, detail="Note not found")
     
+    # Check target to determine if it's from modal
+    hx_target = request.headers.get('HX-Target', '')
+    is_modal = 'modal-note' in hx_target.lower()
+    
+    template = "components/modal_note_card.html" if is_modal else "components/note_card.html"
+    
     return templates.TemplateResponse(
-        "components/note_card.html",
+        template,
         {"request": request, "note": updated_note}
     )
 
@@ -144,3 +162,55 @@ async def delete_note(note_id: int, db: Session = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=404, detail="Note not found")
     return {"success": True}
+
+
+# Modal endpoints
+
+@app.get("/prompts/{prompt_id}/modal")
+async def get_prompt_modal_data(prompt_id: int, db: Session = Depends(get_db)):
+    """Get prompt data in JSON format for modal."""
+    prompt = crud.get_prompt(db, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    return {
+        "id": prompt.id,
+        "title": prompt.title,
+        "content": prompt.content,
+        "updated_at": prompt.updated_at.strftime('%Y-%m-%d %H:%M'),
+        "created_at": prompt.created_at.strftime('%Y-%m-%d %H:%M')
+    }
+
+
+@app.get("/prompts/{prompt_id}/notes-list", response_class=HTMLResponse)
+async def get_modal_notes_list(
+    request: Request,
+    prompt_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get notes list HTML for modal."""
+    prompt = crud.get_prompt(db, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    return templates.TemplateResponse(
+        "components/modal_notes_list.html",
+        {"request": request, "prompt": prompt}
+    )
+
+
+@app.get("/prompts/{prompt_id}/card", response_class=HTMLResponse)
+async def get_prompt_card(
+    request: Request,
+    prompt_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get prompt card HTML."""
+    prompt = crud.get_prompt(db, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    return templates.TemplateResponse(
+        "components/prompt_card.html",
+        {"request": request, "prompt": prompt}
+    )

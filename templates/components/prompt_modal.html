@@ -1,0 +1,170 @@
+<!-- Modal Backdrop -->
+<div x-show="showModal" 
+     x-cloak
+     @click="closeModal()" 
+     class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4"
+     x-transition:enter="transition ease-out duration-300"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-200"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     style="display: none;">
+  
+  <!-- Modal Container -->
+  <div @click.stop 
+       class="bg-white rounded-lg shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col overflow-hidden"
+       x-transition:enter="transition ease-out duration-300"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-200"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95">
+    
+    <!-- Modal Header -->
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-white flex-shrink-0">
+      <div class="flex items-center gap-4 flex-1 min-w-0">
+        <h2 class="text-2xl font-bold text-gray-900 truncate">
+          <span x-show="modalMode === 'view'" x-text="currentPrompt?.title"></span>
+        </h2>
+        <span class="text-xs text-gray-500 flex-shrink-0" x-show="currentPrompt?.updated_at">
+          Updated <span x-text="currentPrompt?.updated_at"></span>
+        </span>
+      </div>
+      <button @click="closeModal()" 
+              class="text-gray-400 hover:text-gray-600 text-3xl font-bold leading-none flex-shrink-0 ml-4"
+              aria-label="Close modal">
+        ×
+      </button>
+    </div>
+    
+    <!-- Two-Column Layout -->
+    <div class="flex flex-col lg:flex-row flex-1 overflow-hidden">
+      
+      <!-- LEFT COLUMN: Prompt Content -->
+      <div class="flex-1 lg:w-2/3 overflow-y-auto p-6 border-r border-gray-200">
+        
+        <!-- View Mode -->
+        <div x-show="modalMode === 'view'">
+          <div class="prose max-w-none">
+            <pre class="text-gray-700 text-base leading-relaxed font-sans bg-transparent border-0 p-0" 
+                 x-text="currentPrompt?.content"></pre>
+          </div>
+          
+          <div class="mt-6 pt-6 border-t border-gray-200">
+            <button @click="toggleEdit()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200">
+              Edit Prompt
+            </button>
+          </div>
+        </div>
+        
+        <!-- Edit Mode -->
+        <div x-show="modalMode === 'edit'" style="display: none;" class="h-full flex flex-col">
+          <form @submit.prevent="submitPromptEdit($event)"
+                class="flex flex-col h-full space-y-4">
+            
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Title</label>
+              <input type="text" 
+                     name="title" 
+                     x-model="currentPrompt.title"
+                     required
+                     class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div class="flex-1 flex flex-col min-h-0">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Content</label>
+              <textarea name="content" 
+                        x-model="currentPrompt.content"
+                        required
+                        class="flex-1 w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
+                        style="min-height: 400px;"></textarea>
+            </div>
+            
+            <div class="flex gap-3 pt-4">
+              <button type="submit"
+                      class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200">
+                Save Changes
+              </button>
+              <button type="button"
+                      @click="toggleEdit()"
+                      class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-lg transition duration-200">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      <!-- RIGHT COLUMN: Notes Sidebar -->
+      <div class="w-full lg:w-1/3 overflow-y-auto p-6 bg-gray-50"
+           @htmx:after-request.window="if ($event.detail.target?.id?.includes('modal-note')) promptChanged = true">
+        <div id="modal-notes-container" x-data="{
+          showAddForm: false,
+          async submitAddNote(event) {
+            const form = event.target;
+            const formData = new FormData(form);
+            const promptId = currentPrompt?.id;
+            if (!promptId) return;
+            
+            const response = await fetch(`/prompts/${promptId}/notes`, {
+              method: 'POST',
+              headers: { 'HX-Target': 'modal-notes-list' },
+              body: formData
+            });
+            const html = await response.text();
+            document.getElementById('modal-notes-list').outerHTML = html;
+            htmx.process(document.getElementById('modal-notes-list'));
+            this.showAddForm = false;
+            form.reset();
+            promptChanged = true;
+          }
+        }">
+          <!-- Notes Header -->
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Notes</h3>
+            <button @click="showAddForm = !showAddForm"
+                    class="text-blue-600 hover:text-blue-800 font-medium text-sm transition duration-200">
+              <span x-show="!showAddForm">+ Add Note</span>
+              <span x-show="showAddForm">Cancel</span>
+            </button>
+          </div>
+          
+          <!-- Add Note Form -->
+          <div x-show="showAddForm" x-transition style="display: none;" class="mb-4">
+            <form @submit.prevent="submitAddNote($event)"
+                  class="space-y-3">
+              <textarea name="content" 
+                        placeholder="Enter your note..."
+                        required
+                        rows="4"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              <div class="flex gap-2">
+                <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-md">
+                  Save Note
+                </button>
+                <button type="button"
+                        @click="showAddForm = false"
+                        class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-semibold py-2 px-4 rounded-md">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+          
+          <!-- Notes List -->
+          <div id="modal-notes-list" class="space-y-3">
+            <p class="text-gray-500 text-sm italic">Loading notes...</p>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<style>
+  [x-cloak] { display: none !important; }
+</style>

@@ -1,7 +1,83 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div x-data="{ showForm: false }">
+<div x-data="{ 
+  showForm: false,
+  showModal: false,
+  modalMode: 'view',
+  currentPrompt: null,
+  promptChanged: false,
+  
+  openModal(promptId) {
+    this.promptChanged = false;
+    // Fetch full prompt data via HTMX
+    fetch(`/prompts/${promptId}/modal`)
+      .then(response => response.json())
+      .then(data => {
+        this.currentPrompt = data;
+        this.modalMode = 'view';
+        this.showModal = true;
+        document.body.style.overflow = 'hidden';
+        // Load notes into modal
+        this.loadModalContent(promptId);
+      });
+  },
+  
+  closeModal() {
+    // Refresh the card if changes were made
+    if (this.promptChanged && this.currentPrompt?.id) {
+      htmx.ajax('GET', `/prompts/${this.currentPrompt.id}/card`, {
+        target: `#prompt-${this.currentPrompt.id}`,
+        swap: 'outerHTML'
+      });
+    }
+    this.showModal = false;
+    this.currentPrompt = null;
+    this.modalMode = 'view';
+    this.promptChanged = false;
+    document.body.style.overflow = '';
+  },
+  
+  toggleEdit() {
+    this.modalMode = this.modalMode === 'view' ? 'edit' : 'view';
+  },
+  
+  async submitPromptEdit(event) {
+    const form = event.target;
+    const formData = new FormData(form);
+    const promptId = this.currentPrompt?.id;
+    if (!promptId) return;
+    
+    const response = await fetch(`/prompts/${promptId}`, {
+      method: 'PUT',
+      body: formData
+    });
+    const html = await response.text();
+    // Update the card in the background
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    const newCard = tempDiv.firstElementChild;
+    const oldCard = document.getElementById(`prompt-${promptId}`);
+    if (oldCard && newCard) {
+      oldCard.replaceWith(newCard);
+      htmx.process(newCard);
+    }
+    // Update modal data
+    const updatedData = await fetch(`/prompts/${promptId}/modal`).then(r => r.json());
+    this.currentPrompt = updatedData;
+    this.modalMode = 'view';
+    this.promptChanged = true;
+  },
+  
+  loadModalContent(promptId) {
+    // Load notes section via HTMX
+    htmx.ajax('GET', `/prompts/${promptId}/notes-list`, {
+      target: '#modal-notes-list',
+      swap: 'outerHTML'
+    });
+  }
+}" 
+@keydown.escape.window="showModal && closeModal()">
     <!-- Hero Section -->
     <div class="mb-8">
         <h2 class="text-3xl font-bold text-gray-900 mb-2">Your AI Prompts</h2>
@@ -80,5 +156,8 @@
     <div id="prompts-list">
         {% include "components/prompt_list.html" %}
     </div>
+    
+    <!-- Modal Component -->
+    {% include "components/prompt_modal.html" %}
 </div>
 {% endblock %}

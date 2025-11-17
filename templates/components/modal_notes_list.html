@@ -1,0 +1,9 @@
+<div id="modal-notes-list" class="space-y-3">
+    {% if prompt.notes %}
+        {% for note in prompt.notes %}
+            {% include 'components/modal_note_card.html' %}
+        {% endfor %}
+    {% else %}
+        <p class="text-gray-500 text-sm italic py-4">No notes yet. Add one to get started.</p>
+    {% endif %}
+</div>
