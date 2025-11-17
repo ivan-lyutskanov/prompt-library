@@ -7,6 +7,7 @@
   modalMode: 'view',
   currentPrompt: null,
   promptChanged: false,
+  importLoading: false,
   
   openModal(promptId) {
     this.promptChanged = false;
@@ -75,6 +76,36 @@
       target: '#modal-notes-list',
       swap: 'outerHTML'
     });
+  },
+  
+  async handleImport(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    this.importLoading = true;
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+      const response = await fetch('/prompts/import', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        const html = await response.text();
+        document.getElementById('prompts-list').innerHTML = html;
+        htmx.process(document.getElementById('prompts-list'));
+        event.target.value = ''; // Reset file input
+      } else {
+        const error = await response.json();
+        alert('Import failed: ' + (error.detail || 'Unknown error'));
+      }
+    } catch (error) {
+      alert('Import failed: ' + error.message);
+    } finally {
+      this.importLoading = false;
+    }
   }
 }" 
 @keydown.escape.window="showModal && closeModal()">
@@ -84,8 +115,8 @@
         <p class="text-gray-600">Manage and organize your AI prompts in one place</p>
     </div>
 
-    <!-- Add New Prompt Button -->
-    <div class="mb-6">
+    <!-- Add New Prompt and Import Buttons -->
+    <div class="mb-6 flex justify-between items-center">
         <button 
             @click="showForm = !showForm"
             class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 shadow-sm"
@@ -93,6 +124,26 @@
             <span x-show="!showForm">+ Add New Prompt</span>
             <span x-show="showForm">Cancel</span>
         </button>
+        
+        <label class="cursor-pointer">
+            <input 
+                type="file" 
+                accept=".json,application/json"
+                @change="handleImport($event)"
+                class="hidden"
+                :disabled="importLoading"
+            >
+            <span 
+                class="inline-flex items-center gap-2 border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-semibold py-2 px-4 rounded-lg transition duration-200"
+                :class="importLoading ? 'opacity-50 cursor-not-allowed' : ''"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span x-show="!importLoading">Import JSON</span>
+                <span x-show="importLoading">Importing...</span>
+            </span>
+        </label>
     </div>
 
     <!-- Create Form -->

@@ -1,9 +1,10 @@
 """FastAPI application entry point."""
-from fastapi import FastAPI, Depends, HTTPException, Request, Form
+from fastapi import FastAPI, Depends, HTTPException, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+import json
 
 from app import crud, models, schemas
 from app.database import engine, get_db
@@ -214,3 +215,68 @@ async def get_prompt_card(
         "components/prompt_card.html",
         {"request": request, "prompt": prompt}
     )
+
+
+@app.get("/prompts/{prompt_id}/export")
+async def export_prompt_json(prompt_id: int, db: Session = Depends(get_db)):
+    """Export prompt with notes in JSON format."""
+    prompt = crud.get_prompt(db, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    
+    return {
+        "title": prompt.title,
+        "content": prompt.content,
+        "created_at": prompt.created_at.isoformat(),
+        "updated_at": prompt.updated_at.isoformat(),
+        "notes": [
+            {
+                "content": note.content,
+                "created_at": note.created_at.isoformat(),
+                "updated_at": note.updated_at.isoformat()
+            }
+            for note in prompt.notes
+        ]
+    }
+
+
+@app.post("/prompts/import", response_class=HTMLResponse)
+async def import_prompt(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Import prompt from JSON file and return updated prompt list."""
+    try:
+        # Read and parse JSON file
+        contents = await file.read()
+        data = json.loads(contents)
+        
+        # Validate required fields
+        if "title" not in data or "content" not in data:
+            raise HTTPException(status_code=400, detail="Invalid JSON: title and content are required")
+        
+        # Create prompt
+        prompt_create = schemas.PromptCreate(
+            title=data["title"],
+            content=data["content"]
+        )
+        new_prompt = crud.create_prompt(db, prompt_create)
+        
+        # Create notes if provided
+        if "notes" in data and isinstance(data["notes"], list):
+            for note_data in data["notes"]:
+                if "content" in note_data:
+                    note_create = schemas.NoteCreate(content=note_data["content"])
+                    crud.create_note(db, new_prompt.id, note_create)
+        
+        # Return updated prompt list
+        prompts = crud.get_prompts(db)
+        return templates.TemplateResponse(
+            "components/prompt_list.html",
+            {"request": request, "prompts": prompts}
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error importing prompt: {str(e)}")
