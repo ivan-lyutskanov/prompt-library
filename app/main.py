@@ -8,6 +8,7 @@ import json
 
 from app import crud, models, schemas
 from app.database import engine, get_db
+from app.markdown_utils import markdown_filter, render_markdown
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -20,6 +21,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Setup templates
 templates = Jinja2Templates(directory="templates")
+
+# Register custom Jinja2 filters
+templates.env.filters['markdown'] = markdown_filter
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -193,6 +197,7 @@ async def get_prompt_modal_data(prompt_id: int, db: Session = Depends(get_db)):
         "id": prompt.id,
         "title": prompt.title,
         "content": prompt.content,
+        "content_html": render_markdown(prompt.content),
         "updated_at": prompt.updated_at.strftime('%Y-%m-%d %H:%M'),
         "created_at": prompt.created_at.strftime('%Y-%m-%d %H:%M')
     }

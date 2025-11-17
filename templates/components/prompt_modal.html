@@ -60,9 +60,9 @@
         
         <!-- View Mode -->
         <div x-show="modalMode === 'view'">
-          <div class="prose max-w-none">
-            <pre class="text-gray-700 text-base leading-relaxed font-sans bg-transparent border-0 p-0" 
-                 x-text="currentPrompt?.content"></pre>
+          <div class="prose prose-lg max-w-none">
+            <div class="text-gray-700 leading-relaxed" 
+                 x-html="currentPrompt?.content_html"></div>
           </div>
           
           <div class="mt-6 pt-6 border-t border-gray-200 flex justify-between items-center">
